@@ -94,7 +94,8 @@ service docker stop
 dockerd -H tcp://0.0.0.0:2080 --iptables=false
 
 [Service]
-    DOCKER_HOST="\"-H tcp://0.0.0.0:2080 --iptables=false -H unix:///var/run/docker.sock\""
+vi /etc/conf.d/docker
+    DOCKER_OPTS="\"-H tcp://0.0.0.0:2080 --iptables=false -H unix:///var/run/docker.sock\""
 
 # termux
 export DOCKER_HOST=localhost:2080
@@ -108,6 +109,7 @@ GUI --> Install Portainer
 ```
 docker run -d -p 8000:8000 -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
 ```
+
 
 
 
