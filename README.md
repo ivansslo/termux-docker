@@ -1,10 +1,10 @@
 # Install 
 
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/termux-docker/main/alpine.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Certve/termux-docker/main/alpine.sh)
 ```
 
-# localhost
+# localhost in alpine
 
 ``
 mkdir -p /etc/udhcpc
@@ -98,6 +98,7 @@ GUI --> Install Portainer
 ```
 docker run -d -p 8000:8000 -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
 ```
+
 
 
 
