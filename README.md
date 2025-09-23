@@ -24,6 +24,12 @@ echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
 ``
  setup-alpine 
+
+ After setup
+ Modify DNS.
+
+sed -i 's/nameserver 94.16.114.254/nameserver 114.114.114.114/g' /etc/resolv.conf 
+sed -i 's/nameserver 185.120.22.15/nameserver 223.5.5.5/g' /etc/resolv.conf
 ``
 
 ---------------------------------
@@ -98,6 +104,7 @@ GUI --> Install Portainer
 ```
 docker run -d -p 8000:8000 -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
 ```
+
 
 
 
