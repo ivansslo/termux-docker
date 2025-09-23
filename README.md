@@ -70,7 +70,7 @@ please Uncomment line 3
 
 apk update
 
-apk add docker
+apk add docker docker-compose  docker-cli-compose --force-broken-world
 rc-update add docker boot
 service docker start
 service docker status
@@ -105,6 +105,7 @@ GUI --> Install Portainer
 ```
 docker run -d -p 8000:8000 -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
 ```
+
 
 
 
