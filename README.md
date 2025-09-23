@@ -91,11 +91,16 @@ pkg install docker -y
 
 service docker start
 service docker stop
-dockerd -H tcp://0.0.0.0:2074 --iptables=false
+dockerd -H tcp://0.0.0.0:2375 --iptables=false
+
+[Service]
+ExecStart=
+
+ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375 --iptables=false
 
 # termux
-export DOCKER_HOST=localhost:2074
-echo "export DOCKER_HOST=localhost:2074" >> ~/.bashrc ; bash
+export DOCKER_HOST=localhost:2375
+echo "export DOCKER_HOST=localhost:2375" >> ~/.bashrc ; bash
 
 ```
 
@@ -105,6 +110,7 @@ GUI --> Install Portainer
 ```
 docker run -d -p 8000:8000 -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
 ```
+
 
 
 
