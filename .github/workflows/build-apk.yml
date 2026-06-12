@@ -1,0 +1,251 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Generate Android wrapper project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p android-build/app/src/main/java/com/example/termuxdocker
+          mkdir -p android-build/app/src/main/assets
+
+          if [ -f alpine.sh ]; then
+            cp alpine.sh android-build/app/src/main/assets/alpine.sh
+          fi
+          if [ -f README.md ]; then
+            cp README.md android-build/app/src/main/assets/README.md
+          fi
+
+          cat > android-build/settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = 'TermuxDockerWrapper'
+          include ':app'
+          EOF
+
+          cat > android-build/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
+
+          cat > android-build/app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+
+          android {
+              namespace 'com.example.termuxdocker'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.example.termuxdocker'
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+
+          cat > android-build/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <queries>
+                  <package android:name="com.termux" />
+              </queries>
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="Termux Docker"
+                  android:allowBackup="false"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          mkdir -p android-build/app/src/main/res/values
+          cat > android-build/app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">true</item>
+                  <item name="android:colorAccent">#1565C0</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > android-build/app/src/main/java/com/example/termuxdocker/MainActivity.java <<'EOF'
+          package com.example.termuxdocker;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Typeface;
+          import android.net.Uri;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.nio.charset.StandardCharsets;
+
+          public class MainActivity extends Activity {
+              private static final String INSTALL_COMMAND = "bash <(curl -fsSL https://raw.githubusercontent.com/ivansslo/termux-docker/main/alpine.sh)";
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  ScrollView scrollView = new ScrollView(this);
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(40, 48, 40, 48);
+                  scrollView.addView(root);
+
+                  TextView title = new TextView(this);
+                  title.setText("Termux Docker Installer");
+                  title.setTextSize(24);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  root.addView(title);
+
+                  TextView desc = new TextView(this);
+                  desc.setText("APK wrapper untuk repo termux-docker. Install Termux terlebih dahulu, lalu jalankan perintah berikut di Termux. APK ini tidak dapat menjalankan Docker langsung tanpa Termux/root/QEMU yang sesuai.");
+                  desc.setTextSize(16);
+                  desc.setPadding(0, 24, 0, 24);
+                  root.addView(desc);
+
+                  TextView cmd = new TextView(this);
+                  cmd.setText(INSTALL_COMMAND);
+                  cmd.setTextSize(14);
+                  cmd.setTypeface(Typeface.MONOSPACE);
+                  cmd.setPadding(24, 24, 24, 24);
+                  root.addView(cmd);
+
+                  Button copyCommand = button("Copy install command");
+                  copyCommand.setOnClickListener(v -> copy("Install command", INSTALL_COMMAND));
+                  root.addView(copyCommand);
+
+                  Button copyScript = button("Copy alpine.sh from APK assets");
+                  copyScript.setOnClickListener(v -> copy("alpine.sh", readAsset("alpine.sh")));
+                  root.addView(copyScript);
+
+                  Button openTermux = button("Open Termux");
+                  openTermux.setOnClickListener(v -> openTermux());
+                  root.addView(openTermux);
+
+                  setContentView(scrollView);
+              }
+
+              private Button button(String text) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setAllCaps(false);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  lp.setMargins(0, 12, 0, 0);
+                  b.setLayoutParams(lp);
+                  b.setGravity(Gravity.CENTER);
+                  return b;
+              }
+
+              private void copy(String label, String text) {
+                  ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                  clipboard.setPrimaryClip(ClipData.newPlainText(label, text == null ? "" : text));
+                  Toast.makeText(this, label + " copied", Toast.LENGTH_SHORT).show();
+              }
+
+              private String readAsset(String name) {
+                  try (InputStream is = getAssets().open(name);
+                       BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                      StringBuilder sb = new StringBuilder();
+                      String line;
+                      while ((line = br.readLine()) != null) sb.append(line).append('\n');
+                      return sb.toString();
+                  } catch (Exception e) {
+                      return "Asset not found: " + name;
+                  }
+              }
+
+              private void openTermux() {
+                  PackageManager pm = getPackageManager();
+                  Intent intent = pm.getLaunchIntentForPackage("com.termux");
+                  if (intent != null) {
+                      startActivity(intent);
+                  } else {
+                      Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/termux/termux-app/releases"));
+                      startActivity(browser);
+                  }
+              }
+          }
+          EOF
+
+      - name: Build APK
+        working-directory: android-build
+        run: gradle assembleDebug
+
+      - name: Rename APK
+        run: |
+          mkdir -p artifacts
+          cp android-build/app/build/outputs/apk/debug/app-debug.apk artifacts/termux-docker-wrapper-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: termux-docker-wrapper-debug-apk
+          path: artifacts/termux-docker-wrapper-debug.apk
